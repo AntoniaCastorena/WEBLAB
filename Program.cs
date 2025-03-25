@@ -1,23 +1,30 @@
-﻿using API_WebLabCon_test.Context;
+﻿using API_WebLabCon_test.Middlewares;
+using API_WebLabCon_test.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Configuración de controladores
-builder.Services.AddControllers();
-
-// 2. Configuración de DbContext para Entity Framework
-builder.Services.AddDbContext<WebLabConaguaContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("WebLabConagua")));
-
-// 3. Configuración de JSON para evitar errores de referencia circular (NewtonsoftJson)
+// 1. Configurar los servicios de la aplicación
 builder.Services.AddControllers()
     .AddNewtonsoftJson(options =>
         options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
     );
 
-// 4. Configuración de Swagger/OpenAPI para desarrollo
+// 2. Configuración de DbContext con cadena de conexión desde appsettings.json
+builder.Services.AddDbContext<WebLabConaguaContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("WebLabConagua")));
+
+// 3. Configuración de CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowWebApp", policy =>
+        policy.WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>())
+              .AllowAnyMethod()
+              .AllowAnyHeader());
+});
+
+// 4. Configuración de Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -25,59 +32,33 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "WebLabConagua API",
         Version = "v1",
-        Description = "API para el sistema de estaciones meteorológicas",
+        Description = "API para el sistema de estaciones de CONAGUA",
         Contact = new OpenApiContact
         {
-            Name = "Tu Nombre",
-            Email = "tu.email@ejemplo.com"
+            Name = "Antonia Ortiz",
+            Email = "antoniaaoc79@gmail.com"
         }
     });
-
-    // Habilitar comentarios XML
-    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    c.IncludeXmlComments(xmlPath);
 });
 
-// ✅ **Configuración de CORS**
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowWebApp", builder =>
-    {
-        builder.WithOrigins("http://localhost:3000") // URL de tu aplicación Next.js
-               .AllowAnyMethod()
-               .AllowAnyHeader()
-               .AllowCredentials(); // Si necesitas enviar cookies
-    });
+var app = builder.Build(); // Se bloquean modificaciones a `builder.Services`
 
-    // Política alternativa para desarrollo
-    options.AddPolicy("AllowAll", builder =>
-    {
-        builder.AllowAnyOrigin()
-               .AllowAnyMethod()
-               .AllowAnyHeader();
-    });
-});
-
-var app = builder.Build(); // Aquí se bloquean las modificaciones a `builder.Services`
-
-// Configurar la canalización de solicitudes HTTP
+// 5. Configuración del middleware HTTP
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "WebLabConagua API v1");
-        c.RoutePrefix = string.Empty; // Para que Swagger UI sea la página de inicio
+        c.RoutePrefix = string.Empty; // Swagger UI en la raíz
     });
 }
 
-// Program.cs
-// Registrar el middleware
+// Middleware personalizado para manejar excepciones
 app.UseMiddleware<ExceptionMiddleware>();
 
 // Aplicar CORS antes de `UseAuthorization()`
-app.UseCors("AllowWebApp"); // O "AllowAll" en desarrollo
+app.UseCors("AllowWebApp");
 
 app.UseHttpsRedirection();
 app.UseAuthorization();

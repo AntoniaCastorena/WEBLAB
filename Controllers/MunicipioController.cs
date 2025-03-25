@@ -2,8 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using API_WebLabCon_test.Models;
 using API_WebLabCon_test.Context;
-using API_WebLabCon_test.Models;
-using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;

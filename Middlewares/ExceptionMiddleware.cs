@@ -1,50 +1,52 @@
-﻿// Middlewares/ExceptionMiddleware.cs
-public class ExceptionMiddleware
+﻿namespace API_WebLabCon_test.Middlewares
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<ExceptionMiddleware> _logger;
-
-    public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
+    public class ExceptionMiddleware
     {
-        _next = next;
-        _logger = logger;
-    }
+        private readonly RequestDelegate _next;
+        private readonly ILogger<ExceptionMiddleware> _logger;
 
-    public async Task InvokeAsync(HttpContext httpContext)
-    {
-        try
+        public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
         {
-            await _next(httpContext);
+            _next = next;
+            _logger = logger;
         }
-        catch (Exception ex)
+
+        public async Task InvokeAsync(HttpContext httpContext)
         {
-            _logger.LogError(ex, "Error no manejado");
-            await HandleExceptionAsync(httpContext, ex);
+            try
+            {
+                await _next(httpContext);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error no manejado");
+                await HandleExceptionAsync(httpContext, ex);
+            }
         }
-    }
 
-    private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
-    {
-        context.Response.ContentType = "application/json";
-
-        var statusCode = exception switch
+        private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
-            KeyNotFoundException => StatusCodes.Status404NotFound,
-            ArgumentException => StatusCodes.Status400BadRequest,
-            UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
-            _ => StatusCodes.Status500InternalServerError
-        };
+            context.Response.ContentType = "application/json";
 
-        context.Response.StatusCode = statusCode;
+            var statusCode = exception switch
+            {
+                KeyNotFoundException => StatusCodes.Status404NotFound,
+                ArgumentException => StatusCodes.Status400BadRequest,
+                UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
+                _ => StatusCodes.Status500InternalServerError
+            };
 
-        var response = new
-        {
-            StatusCode = statusCode,
-            Message = exception.Message,
-            // En producción, considera no devolver detalles del error
-            Details = exception.InnerException?.Message
-        };
+            context.Response.StatusCode = statusCode;
 
-        await context.Response.WriteAsJsonAsync(response);
+            var response = new
+            {
+                StatusCode = statusCode,
+                Message = exception.Message,
+                // En producción, considera no devolver detalles del error
+                Details = exception.InnerException?.Message
+            };
+
+            await context.Response.WriteAsJsonAsync(response);
+        }
     }
 }

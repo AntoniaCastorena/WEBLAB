@@ -19,20 +19,11 @@ namespace API_WebLabCon_test.Controllers
         {
             this.context = context;
         }
-
         // GET: api/Estaciones
         [HttpGet]
-        public ActionResult<IEnumerable<Estacione>> Get(
-            [FromQuery] string? nombreEstacion,
-            [FromQuery] string? municipio,
-            [FromQuery] string? estado,
-            [FromQuery] int pageNumber = 1,
-            [FromQuery] int pageSize = 10)
+        public ActionResult<IEnumerable<Estacione>> Get([FromQuery] string? nombreEstacion, [FromQuery] string? municipio, [FromQuery] string? estado)
         {
-            var query = context.Estaciones
-                .Include(e => e.MunicipioNavigation)
-                    .ThenInclude(m => m.EstadoNavigation)
-                .AsQueryable();
+            var query = context.Estaciones.AsQueryable();
 
             if (!string.IsNullOrEmpty(nombreEstacion))
             {
@@ -46,31 +37,19 @@ namespace API_WebLabCon_test.Controllers
 
             if (!string.IsNullOrEmpty(estado))
             {
-                query = query.Where(e => e.MunicipioNavigation.Estado == estado);
+                query = query.Where(e => context.Municipios
+                    .Where(m => m.IdMunicipio == e.Municipio && m.Estado == estado)
+                    .Any());
             }
 
-            var totalItems = query.Count();
-
-            var estaciones = query
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
+            var estaciones = query.ToList();
 
             if (estaciones.Count == 0)
             {
                 return NotFound("No se encontraron estaciones que coincidan con los criterios de búsqueda.");
             }
 
-            var result = new
-            {
-                TotalItems = totalItems,
-                PageNumber = pageNumber,
-                PageSize = pageSize,
-                TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize),
-                Items = estaciones
-            };
-
-            return Ok(result);
+            return Ok(estaciones);
         }
 
         // GET api/Estaciones/id/{IdEstacion}
@@ -102,5 +81,6 @@ namespace API_WebLabCon_test.Controllers
 
             return Ok(estaciones);
         }
+
     }
 }
