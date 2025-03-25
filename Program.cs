@@ -11,20 +11,26 @@ builder.Services.AddControllers()
         options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
     );
 
-// 2. Configuración de DbContext con cadena de conexión desde appsettings.json
-builder.Services.AddDbContext<WebLabConaguaContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("WebLabConagua")));
+// 2. Obtener la cadena de conexión desde variables de entorno o appsettings.json
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? builder.Configuration.GetConnectionString("WebLabConagua");
 
-// 3. Configuración de CORS
+builder.Services.AddDbContext<WebLabConaguaContext>(options =>
+    options.UseSqlServer(connectionString));
+
+// 3. Configurar CORS dinámico
+var allowedOrigins = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS")?.Split(';')
+    ?? builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowWebApp", policy =>
-        policy.WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>())
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader());
 });
 
-// 4. Configuración de Swagger
+// 4. Configurar Swagger para producción y desarrollo
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -43,21 +49,20 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build(); // Se bloquean modificaciones a `builder.Services`
 
-// 5. Configuración del middleware HTTP
-if (app.Environment.IsDevelopment())
+// 5. Configurar Middleware
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "WebLabConagua API v1");
-        c.RoutePrefix = string.Empty; // Swagger UI en la raíz
+        c.RoutePrefix = "swagger"; // Evita acceso directo en producción
     });
 }
 
 // Middleware personalizado para manejar excepciones
 app.UseMiddleware<ExceptionMiddleware>();
 
-// Aplicar CORS antes de `UseAuthorization()`
 app.UseCors("AllowWebApp");
 
 app.UseHttpsRedirection();
